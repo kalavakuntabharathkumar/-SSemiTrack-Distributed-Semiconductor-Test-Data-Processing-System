@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+option java_package = "com.semitrack.grpc.proto";
+option java_outer_classname = "TestResultProto";
+option java_multiple_files = true;
+
+package semitrack;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Schema for SemiTrack gRPC API
+//
+// All test-result data is modelled here so that any language with a protobuf
+// plugin can consume the SemiTrack service – not just JVM clients.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Outcome of a single die test run.
+enum TestStatus {
+  TEST_STATUS_UNSPECIFIED = 0;
+  TEST_STATUS_PASS        = 1;
+  TEST_STATUS_FAIL        = 2;
+  TEST_STATUS_UNKNOWN     = 3;
+}
+
+// Die coordinate on a wafer.
+message WaferDie {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+// Full test result for one die on one wafer.
+message WaferTestResult {
+  string station_id   = 1;
+  string wafer_id     = 2;
+  WaferDie die        = 3;
+  TestStatus status   = 4;
+  // Parametric measurements, e.g. {"voltage": 1.25, "threshold": 0.55}
+  map<string, double> parametric_values = 5;
+  // ISO-8601 timestamp string
+  string timestamp    = 6;
+}
+
+// ── Requests / Responses ──────────────────────────────────────────────────────
+
+message GetAllResultsRequest {}
+
+message GetAllResultsResponse {
+  repeated WaferTestResult results = 1;
+  int32 total_count               = 2;
+}
+
+message GetWaferResultsRequest {
+  string wafer_id = 1;
+}
+
+message GetWaferResultsResponse {
+  repeated WaferTestResult results = 1;
+}
+
+message GetSummaryRequest {}
+
+message WaferSummary {
+  string wafer_id  = 1;
+  int64 pass_count = 2;
+  int64 fail_count = 3;
+  double yield_pct = 4;
+}
+
+message GetSummaryResponse {
+  repeated WaferSummary summaries = 1;
+  int64 total_pass                = 2;
+  int64 total_fail                = 3;
+}
+
+// ── Service definition ────────────────────────────────────────────────────────
+
+service TestResultService {
+  // Fetch every stored test result in a single response.
+  rpc GetAllResults (GetAllResultsRequest) returns (GetAllResultsResponse);
+
+  // Fetch results for one specific wafer.
+  rpc GetWaferResults (GetWaferResultsRequest) returns (GetWaferResultsResponse);
+
+  // Fetch yield summary grouped by wafer.
+  rpc GetSummary (GetSummaryRequest) returns (GetSummaryResponse);
+
+  // Server-streaming: stream results one by one as they are generated.
+  rpc StreamResults (GetAllResultsRequest) returns (stream WaferTestResult);
+}
