@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SemiTrack Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2d3748;
+            padding: 1.25rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #63b3ed;
+            letter-spacing: 0.05em;
+        }
+
+        header span.badge {
+            background: #2b6cb0;
+            color: #bee3f8;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+        }
+
+        .live-dot {
+            width: 8px; height: 8px;
+            background: #48bb78;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+        /* KPI cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: #1a202c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); border-color: #4299e1; }
+
+        .kpi-card .label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #718096;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-card .value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .kpi-card.pass  .value { color: #48bb78; }
+        .kpi-card.fail  .value { color: #fc8181; }
+        .kpi-card.yield .value { color: #63b3ed; }
+        .kpi-card.total .value { color: #e2e8f0; }
+
+        /* Chart section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: #1a202c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .chart-card h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1rem;
+        }
+
+        .chart-container { position: relative; width: 100%; }
+
+        /* Wafer table */
+        .table-card {
+            background: #1a202c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .table-card h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1rem;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+
+        thead tr { border-bottom: 1px solid #2d3748; }
+        thead th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            color: #718096;
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        tbody tr { border-bottom: 1px solid #171923; transition: background 0.15s; }
+        tbody tr:hover { background: #2d3748; }
+        tbody td { padding: 0.75rem 1rem; }
+
+        .yield-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .yield-bar {
+            height: 6px;
+            background: #2d3748;
+            border-radius: 9999px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .yield-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #48bb78, #38a169);
+            transition: width 0.6s ease;
+        }
+
+        .badge-pass { color: #48bb78; font-weight: 700; }
+        .badge-fail { color: #fc8181; font-weight: 700; }
+
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: #4a5568;
+            font-size: 0.8rem;
+            border-top: 1px solid #1a202c;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="live-dot"></div>
+    <h1>SemiTrack</h1>
+    <span class="badge">DISTRIBUTED TEST MONITOR</span>
+</header>
+
+<main>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card total">
+            <div class="label">Total Dies</div>
+            <div class="value" id="kpi-total" th:text="${totalResults}">0</div>
+        </div>
+        <div class="kpi-card pass">
+            <div class="label">Passed</div>
+            <div class="value" id="kpi-pass" th:text="${passCount}">0</div>
+        </div>
+        <div class="kpi-card fail">
+            <div class="label">Failed</div>
+            <div class="value" id="kpi-fail" th:text="${failCount}">0</div>
+        </div>
+        <div class="kpi-card yield">
+            <div class="label">Yield</div>
+            <div class="value" id="kpi-yield" th:text="${yieldPct + '%'}">0%</div>
+        </div>
+        <div class="kpi-card total">
+            <div class="label">Wafers</div>
+            <div class="value" id="kpi-wafers" th:text="${waferCount}">0</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Pass / Fail per Wafer</h2>
+            <div class="chart-container" style="height:260px">
+                <canvas id="waferBarChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Overall Distribution</h2>
+            <div class="chart-container" style="height:260px">
+                <canvas id="donutChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wafer Table -->
+    <div class="table-card">
+        <h2>Wafer Yield Breakdown</h2>
+        <table id="wafer-table">
+            <thead>
+                <tr>
+                    <th>Wafer ID</th>
+                    <th>Pass</th>
+                    <th>Fail</th>
+                    <th>Total</th>
+                    <th>Yield</th>
+                </tr>
+            </thead>
+            <tbody id="wafer-tbody">
+                <tr th:each="waferId, iterStat : ${waferIds}">
+                    <td th:text="${waferId}">—</td>
+                    <td class="badge-pass" th:text="${passCounts[iterStat.index]}">0</td>
+                    <td class="badge-fail" th:text="${failCounts[iterStat.index]}">0</td>
+                    <td th:text="${passCounts[iterStat.index] + failCounts[iterStat.index]}">0</td>
+                    <td>
+                        <div class="yield-bar-wrap">
+                            <div class="yield-bar">
+                                <div class="yield-bar-fill"
+                                     th:style="'width:' + (passCounts[iterStat.index] * 100 / (passCounts[iterStat.index] + failCounts[iterStat.index])) + '%'">
+                                </div>
+                            </div>
+                            <span th:text="${#numbers.formatDecimal(passCounts[iterStat.index] * 100.0 / (passCounts[iterStat.index] + failCounts[iterStat.index]), 1, 1) + '%'}">0%</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<footer>SemiTrack &mdash; Distributed Semiconductor Test Data Processing System</footer>
+
+<script th:inline="javascript">
+    // Server-side data injected by Thymeleaf
+    const waferIds   = /*[[${waferIds}]]*/ [];
+    const passCounts = /*[[${passCounts}]]*/ [];
+    const failCounts = /*[[${failCounts}]]*/ [];
+    const passTotal  = /*[[${passCount}]]*/ 0;
+    const failTotal  = /*[[${failCount}]]*/ 0;
+
+    // ── Bar chart: pass/fail per wafer ──────────────────────────────────────
+    new Chart(document.getElementById('waferBarChart'), {
+        type: 'bar',
+        data: {
+            labels: waferIds,
+            datasets: [
+                {
+                    label: 'Pass',
+                    data: passCounts,
+                    backgroundColor: 'rgba(72,187,120,0.75)',
+                    borderColor: '#48bb78',
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Fail',
+                    data: failCounts,
+                    backgroundColor: 'rgba(252,129,129,0.75)',
+                    borderColor: '#fc8181',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#a0aec0', font: { size: 12 } } }
+            },
+            scales: {
+                x: {
+                    stacked: false,
+                    ticks: { color: '#718096', maxRotation: 45 },
+                    grid:  { color: '#2d3748' }
+                },
+                y: {
+                    ticks: { color: '#718096' },
+                    grid:  { color: '#2d3748' }
+                }
+            }
+        }
+    });
+
+    // ── Donut chart: overall distribution ────────────────────────────────────
+    new Chart(document.getElementById('donutChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Pass', 'Fail'],
+            datasets: [{
+                data: [passTotal, failTotal],
+                backgroundColor: ['rgba(72,187,120,0.8)', 'rgba(252,129,129,0.8)'],
+                borderColor:     ['#48bb78', '#fc8181'],
+                borderWidth: 2,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#a0aec0', font: { size: 12 }, padding: 16 }
+                }
+            }
+        }
+    });
+
+    // ── Live refresh every 10 s via REST API ─────────────────────────────────
+    async function refresh() {
+        try {
+            const [stats, summary] = await Promise.all([
+                fetch('/api/v1/stats').then(r => r.json()),
+                fetch('/api/v1/summary').then(r => r.json())
+            ]);
+            document.getElementById('kpi-total').textContent  = stats.totalResults;
+            document.getElementById('kpi-pass').textContent   = stats.passCount;
+            document.getElementById('kpi-fail').textContent   = stats.failCount;
+            document.getElementById('kpi-yield').textContent  = stats.overallYield;
+            document.getElementById('kpi-wafers').textContent = stats.waferCount;
+        } catch (e) {
+            console.warn('Dashboard refresh failed:', e);
+        }
+    }
+
+    setInterval(refresh, 10_000);
+</script>
+
+</body>
+</html>
